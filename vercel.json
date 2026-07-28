@@ -1,0 +1,10 @@
+{
+  "services": {
+    "invitation-faida": {
+      "root": ".",
+      "framework": "nextjs",
+      "installCommand": "npm install",
+      "buildCommand": "npm run build"
+    }
+  }
+}
