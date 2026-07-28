@@ -31,8 +31,9 @@ yarn-error.log*
 # env files
 .env
 .env*.local
+!.env.example
 
-# local rsvp data (ephemeral on Render anyway)
+# local rsvp data
 /data/rsvps.json
 /data/rsvps.ndjson
 
