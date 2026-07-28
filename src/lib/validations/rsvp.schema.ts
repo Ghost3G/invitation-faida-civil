@@ -19,7 +19,7 @@ export const rsvpSchema = z
       .number()
       .min(0, "Nombre d'invités invalide")
       .max(10, "Nombre d'invités trop élevé"),
-    drinks: z.array(z.string()).default([]),
+    drinks: z.array(z.string()),
     message: z.string().max(500, "Message trop long").optional(),
   })
   .superRefine((data, ctx) => {

@@ -18,7 +18,8 @@ const RSVP_FILE = path.join(RSVP_DIR, "rsvps.json");
 function mapToRegisterBody(data: RsvpFormData) {
   const rsvpStatus = ATTENDANCE_TO_RSVP[data.attendance];
   const guestCount = data.attendance === "yes" ? Math.max(1, data.guestCount) : 0;
-  const drinkLabels = data.drinks.map(getDrinkLabel).join(", ");
+  const drinks = data.drinks ?? [];
+  const drinkLabels = drinks.map(getDrinkLabel).join(", ");
 
   const notesParts = [
     data.message?.trim(),
@@ -44,7 +45,7 @@ function buildLocalQrPayload(data: RsvpFormData, token: string) {
     phone: data.phone ?? "",
     attendance: data.attendance,
     guests: data.guestCount,
-    drinks: data.drinks.map(getDrinkLabel),
+    drinks: (data.drinks ?? []).map(getDrinkLabel),
     token,
   });
 }
