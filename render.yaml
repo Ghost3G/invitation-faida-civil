@@ -1,0 +1,25 @@
+# Invitation Faida — Render (free)
+# Déployer depuis le dossier INVITATION FAIDA CIVIL
+# (Root Directory = INVITATION FAIDA CIVIL si le repo parent contient plusieurs apps)
+
+services:
+  - type: web
+    name: invitation-faida
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: THREEG_TENANT_SLUG
+        value: mariage-lumiere-faida
+      - key: THREEG_EVENT_SLUG
+        value: mariage-civil
+      - key: THREEG_API_URL
+        sync: false
+      - key: NEXT_PUBLIC_INVITATION_URL
+        sync: false
+      - key: RSVP_ADMIN_SECRET
+        generateValue: true
