@@ -3,17 +3,30 @@ import { Allura, Cormorant_Garamond, Outfit } from "next/font/google";
 import { invitationConfig } from "@/config/invitation.config";
 import "./globals.css";
 
+/** Nettoie une URL publique (évite les valeurs collées en double dans Vercel). */
 function getSiteUrl() {
-  if (process.env.NEXT_PUBLIC_INVITATION_URL) {
-    return process.env.NEXT_PUBLIC_INVITATION_URL;
+  const raw =
+    process.env.NEXT_PUBLIC_INVITATION_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : "") ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    "https://invitation-faida-civil.vercel.app";
+
+  // Si quelqu'un a collé l'URL 2x, on garde le premier https://... valide
+  const match = raw.match(/https?:\/\/[^\s/]+(?:\/[^\s]*)?/i);
+  let url = (match?.[0] ?? raw).trim().replace(/\/$/, "");
+
+  try {
+    const parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return "https://invitation-faida-civil.vercel.app";
   }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  return "http://localhost:3000";
 }
 
 const siteUrl = getSiteUrl();
+const ogImageUrl = `${siteUrl}/images/hero/couple.png`;
 
 /** Corps — moderne, lisible, élégant */
 const outfit = Outfit({
@@ -45,14 +58,24 @@ export const metadata: Metadata = {
   openGraph: {
     title: invitationConfig.event.title,
     description: invitationConfig.event.description,
+    url: siteUrl,
+    siteName: invitationConfig.couple.displayNames,
     type: "website",
     locale: "fr_FR",
-    images: ["/images/og/invitation.png"],
+    images: [
+      {
+        url: ogImageUrl,
+        width: 1200,
+        height: 630,
+        alt: invitationConfig.couple.displayNames,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: invitationConfig.event.title,
     description: invitationConfig.event.description,
+    images: [ogImageUrl],
   },
   appleWebApp: {
     capable: true,

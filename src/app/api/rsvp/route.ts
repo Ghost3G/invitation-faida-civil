@@ -12,9 +12,6 @@ const ATTENDANCE_TO_RSVP = {
   maybe: "maybe",
 } as const;
 
-const RSVP_DIR = path.join(process.cwd(), "data");
-const RSVP_FILE = path.join(RSVP_DIR, "rsvps.json");
-
 function mapToRegisterBody(data: RsvpFormData) {
   const rsvpStatus = ATTENDANCE_TO_RSVP[data.attendance];
   const guestCount = data.attendance === "yes" ? Math.max(1, data.guestCount) : 0;
@@ -55,41 +52,50 @@ async function saveLocalRsvp(
   token: string,
   syncedTo3g: boolean,
 ) {
-  await mkdir(RSVP_DIR, { recursive: true });
+  // Sur Vercel le FS app est en lecture seule — on tente /tmp puis data/
+  const candidates = [
+    path.join("/tmp", "invitation-faida-rsvps"),
+    path.join(process.cwd(), "data"),
+  ];
 
-  let existing: unknown[] = [];
-  try {
-    const raw = await readFile(RSVP_FILE, "utf8");
-    existing = JSON.parse(raw) as unknown[];
-    if (!Array.isArray(existing)) existing = [];
-  } catch {
-    existing = [];
-  }
-
-  existing.push({
+  const record = {
     ...data,
     token,
     syncedTo3g,
     submittedAt: new Date().toISOString(),
-  });
+  };
 
-  await writeFile(RSVP_FILE, JSON.stringify(existing, null, 2), "utf8");
+  let lastError: unknown;
+  for (const dir of candidates) {
+    try {
+      await mkdir(dir, { recursive: true });
+      const file = path.join(dir, "rsvps.json");
+      let existing: unknown[] = [];
+      try {
+        const raw = await readFile(file, "utf8");
+        existing = JSON.parse(raw) as unknown[];
+        if (!Array.isArray(existing)) existing = [];
+      } catch {
+        existing = [];
+      }
+      existing.push(record);
+      await writeFile(file, JSON.stringify(existing, null, 2), "utf8");
+      await appendFile(
+        path.join(dir, "rsvps.ndjson"),
+        `${JSON.stringify(record)}\n`,
+        "utf8",
+      );
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
 
-  // Journal append-only (backup simple)
-  await appendFile(
-    path.join(RSVP_DIR, "rsvps.ndjson"),
-    `${JSON.stringify({
-      ...data,
-      token,
-      syncedTo3g,
-      submittedAt: new Date().toISOString(),
-    })}\n`,
-    "utf8",
-  );
+  console.warn("[RSVP] sauvegarde locale impossible:", lastError);
 }
 
 async function trySync3Gevents(body: ReturnType<typeof mapToRegisterBody>) {
-  const apiUrl = process.env.THREEG_API_URL;
+  const apiUrl = process.env.THREEG_API_URL?.trim();
   if (!apiUrl) {
     return { synced: false as const, data: null };
   }
@@ -146,17 +152,26 @@ export async function GET(request: Request) {
     );
   }
 
-  try {
-    const raw = await readFile(RSVP_FILE, "utf8");
-    const list = JSON.parse(raw) as unknown[];
-    return NextResponse.json({
-      success: true,
-      count: Array.isArray(list) ? list.length : 0,
-      data: Array.isArray(list) ? list : [],
-    });
-  } catch {
-    return NextResponse.json({ success: true, count: 0, data: [] });
+  const candidates = [
+    path.join("/tmp", "invitation-faida-rsvps", "rsvps.json"),
+    path.join(process.cwd(), "data", "rsvps.json"),
+  ];
+
+  for (const file of candidates) {
+    try {
+      const raw = await readFile(file, "utf8");
+      const list = JSON.parse(raw) as unknown[];
+      return NextResponse.json({
+        success: true,
+        count: Array.isArray(list) ? list.length : 0,
+        data: Array.isArray(list) ? list : [],
+      });
+    } catch {
+      // try next
+    }
   }
+
+  return NextResponse.json({ success: true, count: 0, data: [] });
 }
 
 export async function POST(request: Request) {
@@ -171,6 +186,7 @@ export async function POST(request: Request) {
     const qrPayload =
       remote.data?.qrPayload ?? buildLocalQrPayload(data, token);
 
+    // Ne jamais faire échouer la confirmation si la sauvegarde disque échoue
     await saveLocalRsvp(data, token, remote.synced);
 
     return NextResponse.json({
